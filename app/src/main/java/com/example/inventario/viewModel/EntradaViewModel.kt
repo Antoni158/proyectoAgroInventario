@@ -3,31 +3,55 @@ package com.example.inventario.viewModel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.inventario.data.Entrada
-import com.example.inventario.data.Factura
-import com.example.inventario.data.FirebaseRepository
-import com.example.inventario.data.appdatabase
-import com.example.inventario.data.producto
+import com.example.inventario.data.bodega.Entrada
+import com.example.inventario.data.bodega.EntradaDao
+import com.example.inventario.data.bodega.Producto
+import com.example.inventario.data.repos.FirebaseRepository
+import com.example.inventario.data.repos.InventoryRepository
+import com.example.inventario.data.repos.MovimientoInventarioService
+import com.example.inventario.data.repos.appdatabase
+import com.example.inventario.service.NotificationHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import com.example.inventario.util.CodigoGenerator
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Locale
 
+/**
+ * Gestiona la lógica de negocio para las entradas de inventario.
+ */
 class EntradaViewModel(
     application: Application
 ) : AndroidViewModel(application) {
 
     private val db = appdatabase.getDatabase(application)
-    private val dao = db.entradaDao()
-    private val productoDao = db.productoDao()
+    private val entradaDao: EntradaDao = db.entradaDao()
     private val firebaseRepo = FirebaseRepository()
+    private val repository = InventoryRepository(
+        db.bodegaDao(),
+        db.productoDao(),
+        db.categoriaDao(),
+        db.entradaDao(),
+        db.salidaDao(),
+        db.facturaDao(),
+        firebaseRepo
+    )
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
-    private val _filtroPeriodo = MutableStateFlow("Dia") // Dia, Semana, Mes, Año, Todo
+    private val _filtroPeriodo = MutableStateFlow("Dia")
     val filtroPeriodo: StateFlow<String> = _filtroPeriodo
 
     private val _fechaReferencia = MutableStateFlow(Calendar.getInstance())
@@ -36,36 +60,17 @@ class EntradaViewModel(
     val periodoTexto: StateFlow<String> = combine(_filtroPeriodo, _fechaReferencia) { periodo, cal ->
         when (periodo) {
             "Dia" -> "Día: " + SimpleDateFormat("dd 'de' MMMM yyyy", Locale("es", "ES")).format(cal.time)
-            "Semana" -> "Semana " + cal.get(Calendar.WEEK_OF_MONTH) + " de " + SimpleDateFormat("MMMM yyyy", Locale("es", "ES")).format(cal.time)
-            "Mes" -> "Mes de " + SimpleDateFormat("MMMM yyyy", Locale("es", "ES")).format(cal.time).replaceFirstChar { it.uppercase() }
-            "Año" -> "Año " + cal.get(Calendar.YEAR)
-            else -> "Todo el Historial"
+            "Semana" -> "Semana ${cal.get(Calendar.WEEK_OF_MONTH)} de " +
+                SimpleDateFormat("MMMM yyyy", Locale("es", "ES")).format(cal.time)
+            "Mes" -> "Mes de " + SimpleDateFormat("MMMM yyyy", Locale("es", "ES")).format(cal.time)
+            "Año" -> "Año ${cal.get(Calendar.YEAR)}"
+            else -> "Todo Historial"
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Cargando...")
 
-    fun setFiltroPeriodo(periodo: String) {
-        _filtroPeriodo.value = periodo
-    }
-
-    fun setFechaReferencia(calendar: Calendar) {
-        _fechaReferencia.value = calendar
-    }
-
-    @OptIn(ExperimentalCoroutinesApi::class)
-    val allEntradas: Flow<List<Entrada>> = combine(_searchQuery, _filtroPeriodo, _fechaReferencia) { query, periodo, fecha ->
-        Triple(query, periodo, fecha)
-    }.flatMapLatest { (query, periodo, fecha) ->
-        val flow = if (query.isEmpty()) {
-            dao.getAllEntradas()
-        } else {
-            dao.buscarEntradas("", query)
-        }
-        flow.map { lista -> filtrarPorPeriodo(lista, periodo, fecha) }
-    }
-
-    fun setSearchQuery(query: String) {
-        _searchQuery.value = query
-    }
+    fun setSearchQuery(query: String) { _searchQuery.value = query }
+    fun setFiltroPeriodo(periodo: String) { _filtroPeriodo.value = periodo }
+    fun setFechaReferencia(calendar: Calendar) { _fechaReferencia.value = calendar }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     fun obtenerEntradasFiltradas(bodegaId: String): Flow<List<Entrada>> {
@@ -73,9 +78,9 @@ class EntradaViewModel(
             Triple(query, periodo, fecha)
         }.flatMapLatest { (query, periodo, fecha) ->
             val flow = if (query.isEmpty()) {
-                dao.getEntradasByBodega(bodegaId)
+                entradaDao.getEntradasByBodega(bodegaId)
             } else {
-                dao.buscarEntradas(bodegaId, query)
+                entradaDao.buscarEntradas(bodegaId, query)
             }
             flow.map { lista -> filtrarPorPeriodo(lista, periodo, fecha) }
         }
@@ -86,243 +91,166 @@ class EntradaViewModel(
         val sdf = SimpleDateFormat("d/M/yyyy", Locale.getDefault())
         return lista.filter { entrada ->
             try {
-                val fechaEntrada = sdf.parse(entrada.fecha) ?: return@filter false
+                val fechaEntrada = sdf.parse(entrada.fechaIngreso) ?: return@filter false
                 val calEntrada = Calendar.getInstance().apply { time = fechaEntrada }
                 when (periodo) {
-                    "Dia" -> {
-                        calRef.get(Calendar.YEAR) == calEntrada.get(Calendar.YEAR) &&
-                                calRef.get(Calendar.DAY_OF_YEAR) == calEntrada.get(Calendar.DAY_OF_YEAR)
-                    }
-                    "Semana" -> {
-                        calRef.get(Calendar.YEAR) == calEntrada.get(Calendar.YEAR) &&
-                                calRef.get(Calendar.WEEK_OF_YEAR) == calEntrada.get(Calendar.WEEK_OF_YEAR)
-                    }
-                    "Mes" -> {
-                        calRef.get(Calendar.YEAR) == calEntrada.get(Calendar.YEAR) &&
-                                calRef.get(Calendar.MONTH) == calEntrada.get(Calendar.MONTH)
-                    }
-                    "Año" -> {
-                        calRef.get(Calendar.YEAR) == calEntrada.get(Calendar.YEAR)
-                    }
+                    "Dia" -> calRef.get(Calendar.YEAR) == calEntrada.get(Calendar.YEAR) &&
+                        calRef.get(Calendar.DAY_OF_YEAR) == calEntrada.get(Calendar.DAY_OF_YEAR)
+                    "Semana" -> calRef.get(Calendar.YEAR) == calEntrada.get(Calendar.YEAR) &&
+                        calRef.get(Calendar.WEEK_OF_YEAR) == calEntrada.get(Calendar.WEEK_OF_YEAR)
+                    "Mes" -> calRef.get(Calendar.YEAR) == calEntrada.get(Calendar.YEAR) &&
+                        calRef.get(Calendar.MONTH) == calEntrada.get(Calendar.MONTH)
+                    "Año" -> calRef.get(Calendar.YEAR) == calEntrada.get(Calendar.YEAR)
                     else -> true
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 false
             }
         }
     }
 
-    init {
-        sincronizarDesdeFirebase()
-    }
-
-    fun sincronizarDesdeFirebase() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val entradasNube = firebaseRepo.obtenerEntradas()
-                entradasNube.forEach { entrada ->
-                    dao.insert(entrada)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    fun agregarEntrada(entrada: Entrada) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val idGenerado = dao.insert(entrada)
-                val entradaConId = entrada.copy(id = idGenerado.toInt())
-                firebaseRepo.guardarEntrada(entradaConId)
-
-                if (entrada.costoUnitario > 0 && entrada.proveedor.isNotEmpty()) {
-                    val facturaAuto = Factura(
-                        numeroFactura = if (entrada.numeroFactura.isNotEmpty()) entrada.numeroFactura else "ENT-${System.currentTimeMillis() / 1000}",
-                        fecha = entrada.fecha,
-                        proveedor = entrada.proveedor,
-                        total = entrada.costoUnitario * entrada.cantidad,
-                        codigo = entrada.codigo,
-                        productos = "${entrada.cantidad} - ${entrada.descripcion}",
-                        bodegaId = entrada.bodegaId,
-                        notas = "Generada automáticamente desde Entrada: ${entrada.notas}",
-                        categoria = entrada.categoria,
-                        usuario = SessionManager.nombreUsuario()
-                    )
-                    val idFactura = db.facturaDao().insert(facturaAuto)
-                    firebaseRepo.guardarFactura(facturaAuto.copy(id = idFactura.toInt()))
-                }
-
-                val productoExistente = productoDao.obtenerProductoPorCodigo(entrada.codigo)
-                if (productoExistente != null) {
-                    // Cálculo de Costo Promedio Ponderado
-                    val cantidadTotal = productoExistente.cantidad + entrada.cantidad
-                    val costoTotalExistente = productoExistente.cantidad * productoExistente.costo
-                    val costoTotalNuevo = entrada.cantidad * entrada.costoUnitario
-                    val nuevoCostoPromedio = if (cantidadTotal > 0) (costoTotalExistente + costoTotalNuevo) / cantidadTotal else entrada.costoUnitario
-
-                    val productoActualizado = productoExistente.copy(
-                        cantidad = cantidadTotal,
-                        descripcion = entrada.descripcion,
-                        categoria = entrada.categoria,
-                        proveedor = entrada.proveedor,
-                        costo = nuevoCostoPromedio,
-                        stockMinimo = if (entrada.stockMinimo > 0) entrada.stockMinimo else productoExistente.stockMinimo,
-                        unidad = entrada.unidad,
-                        ubicacion = entrada.ubicacion,
-                        fechaIngreso = entrada.fecha,
-                        notas = entrada.notas
-                    )
-                    productoDao.actualizar(productoActualizado)
-                    firebaseRepo.guardarProducto(productoActualizado)
-                } else {
-                    val nuevoProducto = producto(
-                        bodegaId = entrada.bodegaId,
-                        codigo = entrada.codigo,
-                        descripcion = entrada.descripcion,
-                        categoria = entrada.categoria,
-                        cantidad = entrada.cantidad,
-                        unidad = entrada.unidad,
-                        ubicacion = entrada.ubicacion,
-                        proveedor = entrada.proveedor,
-                        costo = entrada.costoUnitario,
-                        stockMinimo = entrada.stockMinimo,
-                        fechaIngreso = entrada.fecha,
-                        notas = entrada.notas
-                    )
-                    productoDao.insertar(nuevoProducto)
-                    firebaseRepo.guardarProducto(nuevoProducto)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
+    fun obtenerEntradas(bodegaId: String): Flow<List<Entrada>> {
+        return entradaDao.getEntradasByBodega(bodegaId)
     }
 
     suspend fun obtenerEntradaPorId(id: Int): Entrada? {
-        return dao.getEntradaById(id)
+        return entradaDao.getEntradaById(id)
     }
 
-    fun actualizarEntrada(nuevaEntrada: Entrada, viejaEntrada: Entrada) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                dao.update(nuevaEntrada)
-                firebaseRepo.guardarEntrada(nuevaEntrada)
+    private val movimientoService = MovimientoInventarioService(db)
 
-                if (viejaEntrada.codigo == nuevaEntrada.codigo) {
-                    val diferencia = nuevaEntrada.cantidad - viejaEntrada.cantidad
-                    val producto = productoDao.obtenerProductoPorCodigo(nuevaEntrada.codigo)
-                    if (producto != null) {
-                        val productoActualizado = producto.copy(
-                            cantidad = producto.cantidad + diferencia,
-                            descripcion = nuevaEntrada.descripcion,
-                            categoria = nuevaEntrada.categoria,
-                            costo = nuevaEntrada.costoUnitario,
-                            unidad = nuevaEntrada.unidad,
-                            ubicacion = nuevaEntrada.ubicacion
-                        )
-                        productoDao.actualizar(productoActualizado)
-                        firebaseRepo.guardarProducto(productoActualizado)
-                    }
-                } else {
-                    val productoViejo = productoDao.obtenerProductoPorCodigo(viejaEntrada.codigo)
-                    if (productoViejo != null) {
-                        val pVActualizado = productoViejo.copy(cantidad = (productoViejo.cantidad - viejaEntrada.cantidad).coerceAtLeast(0))
-                        productoDao.actualizar(pVActualizado)
-                        firebaseRepo.guardarProducto(pVActualizado)
-                    }
-                    val productoNuevo = productoDao.obtenerProductoPorCodigo(nuevaEntrada.codigo)
-                    if (productoNuevo != null) {
-                        val pNActualizado = productoNuevo.copy(
-                            cantidad = productoNuevo.cantidad + nuevaEntrada.cantidad,
-                            descripcion = nuevaEntrada.descripcion,
-                            categoria = nuevaEntrada.categoria,
-                            costo = nuevaEntrada.costoUnitario,
-                            unidad = nuevaEntrada.unidad,
-                            ubicacion = nuevaEntrada.ubicacion
-                        )
-                        productoDao.actualizar(pNActualizado)
-                        firebaseRepo.guardarProducto(pNActualizado)
-                    }
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+    suspend fun registrarEntradaCompleta(
+        entrada: Entrada,
+        productoNuevo: Producto? = null
+    ): MovimientoInventarioService.ResultadoMovimiento {
+        val result = movimientoService.registrarEntrada(entrada, productoNuevo)
+        if (result is MovimientoInventarioService.ResultadoMovimiento.EntradaOk) {
+            val ctx = getApplication<Application>().applicationContext
+            NotificationHelper.registrar(
+                ctx,
+                "Entrada registrada",
+                "${result.entrada.descripcion} · ${result.entrada.cantidad} uds · ${result.entrada.codigoProducto}",
+                "ENTRADA",
+                result.entrada.bodegaId,
+                result.entrada.id.toString(),
+                result.entrada.codigoProducto
+            )
+        }
+        return result
+    }
+
+    fun agregarEntrada(entrada: Entrada, productoNuevo: Producto? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            registrarEntradaCompleta(entrada, productoNuevo)
         }
     }
 
-    suspend fun buscarProductoPorCodigo(codigo: String): producto? {
-        return productoDao.obtenerProductoPorCodigo(codigo)
+    fun actualizarEntrada(entrada: Entrada) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val status = calcularStatus(
+                cantidad = entrada.cantidad,
+                stockMinimo = entrada.stockMinimo
+            )
+            val actualizada = entrada.copy(
+                status = status,
+                presupuesto = entrada.cantidad * entrada.costoEntrada
+            )
+            repository.updateEntrada(actualizada)
+        }
     }
 
     fun eliminarEntrada(entrada: Entrada) {
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                // Soft Delete
-                val now = System.currentTimeMillis()
-                dao.softDelete(entrada.id, now)
-                firebaseRepo.guardarEntrada(entrada.copy(isDeleted = true, deletionDate = now))
-
-                // Revertir stock al eliminar entrada
-                val producto = productoDao.obtenerProductoPorCodigo(entrada.codigo)
-                if (producto != null) {
-                    val nuevaCantidad = (producto.cantidad - entrada.cantidad).coerceAtLeast(0)
-                    val productoActualizado = producto.copy(cantidad = nuevaCantidad)
-                    productoDao.actualizar(productoActualizado)
-                    firebaseRepo.guardarProducto(productoActualizado)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            repository.deleteEntrada(entrada)
         }
     }
 
     fun restaurarEntrada(entrada: Entrada) {
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                dao.restore(entrada.id)
-                firebaseRepo.guardarEntrada(entrada.copy(isDeleted = false, deletionDate = null))
-
-                // Restaurar stock
-                val producto = productoDao.obtenerProductoPorCodigo(entrada.codigo)
-                if (producto != null) {
-                    val productoActualizado = producto.copy(cantidad = producto.cantidad + entrada.cantidad)
-                    productoDao.actualizar(productoActualizado)
-                    firebaseRepo.guardarProducto(productoActualizado)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            repository.restoreEntrada(entrada.id)
         }
     }
 
-    fun obtenerPapelera() = dao.getDeletedEntradas()
+    fun eliminarPermanentemente(entrada: Entrada) {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.deleteEntradaPermanently(
+                entrada.id,
+                entrada.bodegaId,
+                entrada.codigoBodega
+            )
+        }
+    }
+
+    fun buscarEntradas(bodegaId: String, query: String): Flow<List<Entrada>> {
+        return entradaDao.buscarEntradas(bodegaId, query)
+    }
+
+    fun obtenerEntradasCodigo(codigoProducto: String, bodegaId: String): Flow<List<Entrada>> {
+        return entradaDao.getEntradasByCodigo(codigoProducto, bodegaId)
+    }
+
+    fun obtenerEntradasStock(): Flow<List<Entrada>> {
+        return entradaDao.getEntradasStock()
+    }
+
+    fun obtenerEntradasStatus(status: String): Flow<List<Entrada>> {
+        return entradaDao.getEntradasByStatus(status)
+    }
+
+    fun obtenerEntradasTipo(tipoEntrada: String): Flow<List<Entrada>> {
+        return entradaDao.getEntradasByTipo(tipoEntrada)
+    }
+
+    fun obtenerEntradasVencimiento(): Flow<List<Entrada>> {
+        return entradaDao.getEntradasVencimiento()
+    }
+
+    fun obtenerPapelera(): Flow<List<Entrada>> {
+        return entradaDao.getDeletedEntradas()
+    }
+
+    fun actualizarStatus(id: Int, status: String) {
+        viewModelScope.launch {
+            entradaDao.actualizarStatus(id, status)
+        }
+    }
+
+    fun generarCodigoEntrada(bodegaId: String = ""): String = runBlocking(Dispatchers.IO) {
+        val codigos = if (bodegaId.isBlank()) emptyList()
+        else entradaDao.listarCodigosEntrada(bodegaId)
+        CodigoGenerator.generarCodigoTipo("entrada", codigos)
+    }
+
+    private fun calcularStatus(cantidad: Int, stockMinimo: Int): String {
+        return when {
+            cantidad <= 0 -> "SIN_STOCK"
+            cantidad <= stockMinimo -> "STOCK_BAJO"
+            else -> "ACTIVO"
+        }
+    }
+
+    fun calcularTotalEntradas(entradas: List<Entrada>): Int {
+        return entradas.sumOf { it.cantidad }
+    }
+
+    fun calcularTotalCosto(entradas: List<Entrada>): Double {
+        return entradas.sumOf { it.presupuesto }
+    }
+
+    fun calcularProductosUnicos(entradas: List<Entrada>): Int {
+        return entradas.map { it.codigoProducto }.distinct().count()
+    }
 
     fun purgarAntiguos() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch {
             val threshold = System.currentTimeMillis() - (90L * 24 * 60 * 60 * 1000)
-            dao.permanentPurge(threshold)
+            entradaDao.permanentPurge(threshold)
         }
-    }
-
-    fun eliminarPermanente(entrada: Entrada) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                dao.deletePermanently(entrada.id)
-                firebaseRepo.eliminarEntrada(entrada.id)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    fun obtenerEntradasPorBodega(bodegaId: String): Flow<List<Entrada>> {
-        return dao.getEntradasByBodega(bodegaId)
     }
 
     fun eliminarTodo() {
-        viewModelScope.launch(Dispatchers.IO) {
-            dao.deleteAll()
+        viewModelScope.launch {
+            entradaDao.deleteAll()
         }
     }
 }

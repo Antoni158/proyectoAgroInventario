@@ -2,553 +2,248 @@ package com.example.inventario.ui.login
 
 import android.app.Application
 import android.widget.Toast
-
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-
 import androidx.navigation.NavController
-
+import com.example.inventario.navigation.NavRoutes
+import com.example.inventario.data.repos.CloudSyncManager
+import com.example.inventario.security.AppPreferences
+import com.example.inventario.ui.branding.AgriculturalBackground
+import com.example.inventario.ui.branding.BrandLogo
+import com.example.inventario.ui.components.design.GlassCard
+import com.example.inventario.ui.components.design.ModernTextField
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import com.example.inventario.ui.theme.BrandColors
 import com.example.inventario.viewModel.SessionManager
 import com.example.inventario.viewModel.UsuarioViewModel
-
 import kotlinx.coroutines.launch
 
 @Composable
-fun LoginScreen(
-
-    navController: NavController
-
-) {
-
+fun LoginScreen(navController: NavController) {
     val context = LocalContext.current
-
     val scope = rememberCoroutineScope()
-
     val viewModel: UsuarioViewModel = viewModel(
-
-        factory = ViewModelProvider.AndroidViewModelFactory
-            .getInstance(
-                context.applicationContext as Application
-            )
+        factory = ViewModelProvider.AndroidViewModelFactory.getInstance(
+            context.applicationContext as Application
+        )
     )
 
-    // admin o usuario
+    var usuario by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    val cardAlpha = remember { Animatable(0f) }
+    val cardOffset = remember { Animatable(40f) }
 
-    var loginAdmin by remember {
-
-        mutableStateOf(false)
+    LaunchedEffect(Unit) {
+        cardAlpha.animateTo(1f, tween(800))
+        cardOffset.animateTo(0f, tween(800))
     }
 
-    var usuario by remember {
-
-        mutableStateOf("")
-    }
-
-    var password by remember {
-
-        mutableStateOf("")
-    }
-
-    // ojito contraseña
-
-    var passwordVisible by remember {
-
-        mutableStateOf(false)
-    }
-
-    Scaffold(
-
-        containerColor =
-            MaterialTheme.colorScheme.background
-
-    ) { innerPadding ->
-
-        Surface(
-
+    Scaffold(containerColor = Color.Transparent) { innerPadding ->
+        AgriculturalBackground(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-
-            color = MaterialTheme.colorScheme.background
-
+                .padding(innerPadding)
         ) {
-
             Box(
-
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        MaterialTheme.colorScheme.background
-                    ),
-
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
-
             ) {
-
-                Card(
-
-                    shape = RoundedCornerShape(20.dp),
-
+                Column(
                     modifier = Modifier
-                        .padding(20.dp)
+                        .padding(horizontal = 24.dp)
                         .fillMaxWidth(),
-
-                    colors = CardDefaults.cardColors(
-
-                        containerColor =
-                            MaterialTheme.colorScheme.surface
-                    )
-
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    BrandLogo(
+                        size = 140.dp,
+                        showTitle = false,
+                        animate = true,
+                        animationProgress = cardAlpha.value
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Centro de Inventario",
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                    Column(
-
-                        modifier = Modifier.padding(20.dp),
-
-                        horizontalAlignment =
-                            Alignment.CenterHorizontally,
-
-                        verticalArrangement =
-                            Arrangement.Center
-
+                    GlassCard(
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-
-                        Box(
-
-                            modifier = Modifier
-                                .size(70.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    MaterialTheme.colorScheme.primary
-                                ),
-
-                            contentAlignment = Alignment.Center
-
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-
-                            Icon(
-
-                                imageVector = Icons.Default.Home,
-
-                                contentDescription = null,
-
-                                tint =
-                                    MaterialTheme.colorScheme.onPrimary
+                            Text(
+                                text = "Iniciar sesión",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = BrandColors.TextoOscuro
                             )
-                        }
-
-                        Spacer(
-                            modifier = Modifier.height(10.dp)
-                        )
-
-                        Text(
-
-                            text = "Sistema de Inventario",
-
-                            fontWeight = FontWeight.Bold,
-
-                            fontSize = 20.sp,
-
-                            color =
-                                MaterialTheme.colorScheme.onBackground
-                        )
-
-                        Text(
-
-                            text =
-                                if (loginAdmin)
-                                    "Modo Administrador"
-                                else
-                                    "Modo Usuario",
-
-                            fontSize = 12.sp,
-
-                            color =
-                                MaterialTheme.colorScheme.primary
-                        )
-
-                        Spacer(
-                            modifier = Modifier.height(16.dp)
-                        )
-
-                        // selector admin usuario
-
-                        Row(
-
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-
-                                    MaterialTheme.colorScheme.background,
-
-                                    RoundedCornerShape(50.dp)
-                                )
-                                .padding(4.dp)
-                        ) {
-
-                            Button(
-
-                                onClick = {
-
-                                    loginAdmin = false
-                                },
-
-                                colors = ButtonDefaults.buttonColors(
-
-                                    containerColor = if (!loginAdmin)
-
-                                        MaterialTheme.colorScheme.primary
-
-                                    else
-
-                                        MaterialTheme.colorScheme.surface
-                                ),
-
-                                shape = RoundedCornerShape(50.dp),
-
-                                modifier = Modifier.weight(1f)
-
-                            ) {
-
-                                Text(
-
-                                    text = "Usuario",
-
-                                    color = if (!loginAdmin)
-
-                                        MaterialTheme.colorScheme.onPrimary
-
-                                    else
-
-                                        MaterialTheme.colorScheme.onBackground
-                                )
-                            }
-
-                            Button(
-
-                                onClick = {
-
-                                    loginAdmin = true
-                                },
-
-                                colors = ButtonDefaults.buttonColors(
-
-                                    containerColor = if (loginAdmin)
-
-                                        MaterialTheme.colorScheme.primary
-
-                                    else
-
-                                        MaterialTheme.colorScheme.surface
-                                ),
-
-                                shape = RoundedCornerShape(50.dp),
-
-                                modifier = Modifier.weight(1f)
-
-                            ) {
-
-                                Text(
-
-                                    text = "Administrador",
-
-                                    color = if (loginAdmin)
-
-                                        MaterialTheme.colorScheme.onPrimary
-
-                                    else
-
-                                        MaterialTheme.colorScheme.onBackground
-                                )
-                            }
-                        }
-
-                        Spacer(
-                            modifier = Modifier.height(16.dp)
-                        )
-
-                        OutlinedTextField(
-
-                            value = usuario,
-
-                            onValueChange = {
-
-                                usuario = it
-                            },
-
-                            label = {
-
-                                Text("Usuario")
-                            },
-
-                            modifier = Modifier.fillMaxWidth(),
-
-                            colors = OutlinedTextFieldDefaults.colors(
-
-                                focusedBorderColor =
-                                    MaterialTheme.colorScheme.primary,
-
-                                focusedLabelColor =
-                                    MaterialTheme.colorScheme.primary
-                            ),
-
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        Spacer(
-                            modifier = Modifier.height(10.dp)
-                        )
-
-                        OutlinedTextField(
-
-                            value = password,
-
-                            onValueChange = {
-
-                                password = it
-                            },
-
-                            label = {
-
-                                Text("Contraseña")
-                            },
-
-                            modifier = Modifier.fillMaxWidth(),
-
-                            visualTransformation =
-
-                                if (passwordVisible)
-
+                            Text(
+                                text = "Acceso seguro · Inventario Agrícola",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = BrandColors.VerdePrincipal
+                            )
+
+                            ModernTextField(
+                                value = usuario,
+                                onValueChange = { usuario = it },
+                                label = "Usuario",
+                                leadingIcon = Icons.Default.Person,
+                                isError = usuario.isBlank() && password.isNotBlank(),
+                                errorMessage = if (usuario.isBlank() && password.isNotBlank()) "Ingrese usuario" else null
+                            )
+
+                            ModernTextField(
+                                value = password,
+                                onValueChange = { password = it },
+                                label = "Contraseña",
+                                leadingIcon = Icons.Default.Lock,
+                                visualTransformation = if (passwordVisible) {
                                     VisualTransformation.None
-
-                                else
-
-                                    PasswordVisualTransformation(),
-
-                            trailingIcon = {
-
-                                val image =
-
-                                    if (passwordVisible)
-
+                                } else {
+                                    PasswordVisualTransformation()
+                                },
+                                trailingIcon = {
+                                    val image = if (passwordVisible) {
                                         Icons.Filled.Visibility
-
-                                    else
-
+                                    } else {
                                         Icons.Filled.VisibilityOff
-
-                                IconButton(
-
-                                    onClick = {
-
-                                        passwordVisible =
-                                            !passwordVisible
                                     }
-
-                                ) {
-
-                                    Icon(
-
-                                        imageVector = image,
-
-                                        contentDescription = null
-                                    )
+                                    androidx.compose.material3.IconButton(
+                                        onClick = { passwordVisible = !passwordVisible }
+                                    ) {
+                                        androidx.compose.material3.Icon(
+                                            imageVector = image,
+                                            contentDescription = null
+                                        )
+                                    }
                                 }
-                            },
+                            )
 
-                            colors = OutlinedTextFieldDefaults.colors(
-
-                                focusedBorderColor =
-                                    MaterialTheme.colorScheme.primary,
-
-                                focusedLabelColor =
-                                    MaterialTheme.colorScheme.primary
-                            ),
-
-                            shape = RoundedCornerShape(12.dp)
-                        )
-
-                        Spacer(
-                            modifier = Modifier.height(16.dp)
-                        )
-
-                        Button(
-
-                            onClick = {
-
-                                if (
-                                    usuario.isEmpty() ||
-                                    password.isEmpty()
-                                ) {
-
-                                    Toast.makeText(
-
-                                        context,
-
-                                        "Complete todos los campos",
-
-                                        Toast.LENGTH_SHORT
-
-                                    ).show()
-
-                                    return@Button
-                                }
-
-                                scope.launch {
-
-                                    val user =
-                                        viewModel.login(
-                                            usuario,
-                                            password
+                            Button(
+                                onClick = {
+                                    if (usuario.isEmpty() || password.isEmpty()) {
+                                        Toast.makeText(
+                                            context,
+                                            "Complete todos los campos",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        return@Button
+                                    }
+                                    scope.launch {
+                                        // Primero intentamos login local por si ya hay datos
+                                        var user = viewModel.login(
+                                            usuario.trim(),
+                                            password.trim()
                                         )
 
-                                    if (user != null) {
-
-                                        // validar admin
-
-                                        if (
-                                            loginAdmin
-                                            &&
-                                            user.rol != "admin"
-                                        ) {
-
-                                            Toast.makeText(
-
-                                                context,
-
-                                                "Este usuario no es administrador",
-
-                                                Toast.LENGTH_SHORT
-
-                                            ).show()
-
-                                            return@launch
-                                        }
-
-                                        SessionManager.login(user)
-
-                                        Toast.makeText(
-
-                                            context,
-
-                                            "Bienvenido ${user.user}",
-
-                                            Toast.LENGTH_SHORT
-
-                                        ).show()
-
-                                        navController.navigate("menuP") {
-
-                                            popUpTo("login") {
-
-                                                inclusive = true
+                                        // Si no está local, intentamos sincronizar usuarios de Firebase y re-intentar login
+                                        if (user == null) {
+                                            android.util.Log.i("LOGIN", "Usuario no encontrado localmente, intentando sincronizar con Firebase...")
+                                            val syncManager = CloudSyncManager(context)
+                                            val syncRes = syncManager.sincronizarBidireccional()
+                                            if (syncRes.ok) {
+                                                user = viewModel.login(usuario.trim(), password.trim())
                                             }
                                         }
 
-                                    } else {
+                                        if (user != null) {
+                                            SessionManager.login(user)
+                                            AppPreferences.init(context)
+                                            AppPreferences.guardarSesion(user.username)
+                                            
+                                            // Aseguramos que el resto de datos estén sincronizados
+                                            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                                CloudSyncManager(context).sincronizarBidireccional()
+                                            }
 
-                                        Toast.makeText(
-
-                                            context,
-
-                                            "Usuario o contraseña incorrectos",
-
-                                            Toast.LENGTH_SHORT
-
-                                        ).show()
+                                            Toast.makeText(
+                                                context,
+                                                "Bienvenido ${user.username}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            navController.navigate(NavRoutes.MENU_PRINCIPAL) {
+                                                popUpTo(NavRoutes.LOGIN) { inclusive = true }
+                                            }
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                "Usuario o contraseña incorrectos",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
                                     }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = BrandColors.VerdePrincipal
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = "Iniciar sesión",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    navController.navigate(NavRoutes.RECUPERAR_PASSWORD)
                                 }
-                            },
-
-                            modifier = Modifier.fillMaxWidth(),
-
-                            colors = ButtonDefaults.buttonColors(
-
-                                containerColor =
-                                    MaterialTheme.colorScheme.primary
-                            ),
-
-                            shape = RoundedCornerShape(12.dp)
-
-                        ) {
-
-                            Text(
-
-                                text = "Entrar",
-
-                                color =
-                                    MaterialTheme.colorScheme.onPrimary
-                            )
-                        }
-
-                        Spacer(
-                            modifier = Modifier.height(10.dp)
-                        )
-
-                        TextButton(
-
-                            onClick = {}
-
-                        ) {
-
-                            Text(
-
-                                text = "¿Necesitas ayuda?",
-
-                                color =
-                                    MaterialTheme.colorScheme.primary
-                            )
+                            ) {
+                                Text(
+                                    text = "Recuperar contraseña",
+                                    color = BrandColors.VerdePrincipal
+                                )
+                            }
                         }
                     }
                 }

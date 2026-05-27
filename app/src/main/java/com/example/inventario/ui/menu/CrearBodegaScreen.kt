@@ -6,8 +6,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.inventario.ui.AppTopBar
+import com.example.inventario.ui.config.notifications.AppTopBar
 import com.example.inventario.viewModel.BodegaViewModel
+import com.example.inventario.ui.components.navigateBackSafely
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -16,6 +17,7 @@ fun CrearBodegaScreen(
     viewModel: BodegaViewModel
 ) {
     var nombre by remember { mutableStateOf("") }
+    var descripcion by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -59,16 +61,26 @@ fun CrearBodegaScreen(
                         onValueChange = { nombre = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Nombre de la Bodega") },
-                        placeholder = { Text("Ej: Bodega Central") },
+                        placeholder = { Text("Ej: Bodega Taller Zacapa") },
                         singleLine = true,
+                        shape = MaterialTheme.shapes.medium
+                    )
+
+                    OutlinedTextField(
+                        value = descripcion,
+                        onValueChange = { descripcion = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Descripción") },
+                        placeholder = { Text("Ubicación o notas") },
+                        minLines = 2,
                         shape = MaterialTheme.shapes.medium
                     )
 
                     Button(
                         onClick = {
                             if (nombre.isNotBlank()) {
-                                viewModel.crearBodega(nombre)
-                                navController.popBackStack()
+                                viewModel.crearBodega(nombre, descripcion)
+                                navController.navigateBackSafely()
                             }
                         },
                         modifier = Modifier.fillMaxWidth().height(50.dp),

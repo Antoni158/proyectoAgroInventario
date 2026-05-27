@@ -18,6 +18,8 @@ foundation = "1.11.0"
 playServicesCastFramework = "22.3.1"
 identityJvm = "202411.1"
 material3 = "1.4.0"
+uiText = "1.11.2"
+room3CompilerProcessingTesting = "3.0.0-alpha05"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -45,6 +47,8 @@ androidx-compose-foundation = { group = "androidx.compose.foundation", name = "f
 play-services-cast-framework = { group = "com.google.android.gms", name = "play-services-cast-framework", version.ref = "playServicesCastFramework" }
 identity-jvm = { group = "com.android.identity", name = "identity-jvm", version.ref = "identityJvm" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
+androidx-compose-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.ref = "uiText" }
+androidx-room3-compiler-processing-testing = { group = "androidx.room3", name = "room3-compiler-processing-testing", version.ref = "room3CompilerProcessingTesting" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

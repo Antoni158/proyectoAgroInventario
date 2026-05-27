@@ -7,14 +7,21 @@ import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import com.example.inventario.data.Factura
+import com.example.inventario.data.bodega.Factura
+import com.example.inventario.ui.branding.BrandingExports
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-fun exportarFacturasPDF(context: Context, facturas: List<Factura>, periodo: String) {
+fun exportarFacturasPDF(
+    context: Context,
+    facturas: List<Factura>,
+    periodo: String,
+    bodegaId: String = facturas.firstOrNull()?.bodegaId.orEmpty(),
+    etiquetaBodega: String = bodegaId
+) {
     val file = File(context.cacheDir, "facturas_${System.currentTimeMillis()}.pdf")
     val pdfDocument = PdfDocument()
     
@@ -29,13 +36,11 @@ fun exportarFacturasPDF(context: Context, facturas: List<Factura>, periodo: Stri
     val encabezadoPaint = Paint().apply { textSize = 14f; isFakeBoldText = true }
     val lineaPaint = Paint().apply { strokeWidth = 1f }
 
-    canvas.drawText("Reporte General de Facturas", 50f, 60f, tituloPaint)
-    canvas.drawText("Periodo: $periodo", 50f, 95f, subtituloPaint)
-
-    val fechaActual = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
-    canvas.drawText("Generado el: $fechaActual", 50f, 130f, textoPaint)
-
-    var y = 180f
+    var y = BrandingExports.drawPdfHeader(
+        context, canvas, pageInfo.pageWidth,
+        "Reporte General de Facturas",
+        "Periodo: $periodo · Bodega: $etiquetaBodega"
+    ) + 20f
     // Encabezados
     canvas.drawText("N° Factura", 40f, y, encabezadoPaint)
     canvas.drawText("Fecha", 180f, y, encabezadoPaint)
@@ -57,7 +62,7 @@ fun exportarFacturasPDF(context: Context, facturas: List<Factura>, periodo: Stri
         canvas.drawText(f.numeroFactura, 40f, y, textoPaint)
         canvas.drawText(f.fecha, 180f, y, textoPaint)
         canvas.drawText(f.proveedor.take(20), 320f, y, textoPaint)
-        canvas.drawText("${f.codigo} - ${f.productos.take(15)}", 550f, y, textoPaint)
+        canvas.drawText("${f.codigo} - ${f.descripcion.take(15)}", 550f, y, textoPaint)
         canvas.drawText(f.categoria, 800f, y, textoPaint)
         canvas.drawText(f.notas.take(25), 1000f, y, textoPaint)
         canvas.drawText("Q${String.format(Locale.US, "%.2f", f.total)}", 1250f, y, textoPaint)

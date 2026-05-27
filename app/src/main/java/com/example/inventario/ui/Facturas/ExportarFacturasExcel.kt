@@ -2,165 +2,67 @@ package com.example.inventario.ui.Facturas
 
 import android.content.Context
 import android.widget.Toast
-
-import com.example.inventario.data.Factura
-
+import com.example.inventario.data.bodega.Factura
+import com.example.inventario.ui.branding.BrandingExports
+import com.example.inventario.ui.export.ExportShareUtil
+import org.apache.poi.ss.usermodel.FillPatternType
+import org.apache.poi.ss.usermodel.IndexedColors
+import org.apache.poi.xssf.usermodel.XSSFCellStyle
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
-
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
 
 fun exportarFacturasExcel(
-
     context: Context,
-
     facturas: List<Factura>,
-
-    periodo: String
-
+    periodo: String,
+    etiquetaBodega: String = ""
 ) {
-
-    val workbook = XSSFWorkbook()
-
-    val sheet =
-        workbook.createSheet("Facturas")
-
-    // encabezados
-
-    val headers = listOf(
-
-        "Fecha",
-
-        "Nº Factura",
-
-        "Proveedor",
-
-        "Productos",
-
-        "Total",
-
-        "Usuario",
-
-        "Notas"
-    )
-
-    // titulo
-
-    val titleRow =
-        sheet.createRow(0)
-
-    titleRow
-        .createCell(0)
-        .setCellValue(
-
-            "Reporte de Facturas - Periodo: $periodo"
+    try {
+        val workbook = XSSFWorkbook()
+        val sheet = workbook.createSheet("Facturas")
+        val headers = listOf(
+            "Fecha", "Nº Factura", "Proveedor", "Código",
+            "Descripción", "Total", "Usuario", "Notas"
+        )
+        val sub = if (etiquetaBodega.isNotBlank()) "Periodo: $periodo · Bodega: $etiquetaBodega"
+        else "Periodo: $periodo"
+        val startRow = BrandingExports.applyExcelBrandHeader(
+            workbook, sheet, "Reporte de Facturas", headers, sub
         )
 
-    // encabezados tabla
+        facturas.forEachIndexed { index, factura ->
+            val row = sheet.createRow(startRow + index)
+            row.createCell(0).setCellValue(factura.fecha)
+            row.createCell(1).setCellValue(factura.numeroFactura)
+            row.createCell(2).setCellValue(factura.proveedor)
+            row.createCell(3).setCellValue(factura.codigo)
+            row.createCell(4).setCellValue(factura.descripcion)
+            row.createCell(5).setCellValue(factura.total)
+            row.createCell(6).setCellValue(factura.usuario)
+            row.createCell(7).setCellValue(factura.notas)
+        }
 
-    val headerRow =
-        sheet.createRow(2)
+        val totalRow = sheet.createRow(startRow + facturas.size + 1)
+        val totalStyle: XSSFCellStyle = workbook.createCellStyle().apply {
+            val font = workbook.createFont().apply { bold = true }
+            setFont(font)
+            fillForegroundColor = IndexedColors.LIGHT_GREEN.index
+            fillPattern = FillPatternType.SOLID_FOREGROUND
+        }
+        totalRow.createCell(0).apply { setCellValue("TOTAL"); cellStyle = totalStyle }
+        totalRow.createCell(5).apply {
+            setCellValue(facturas.sumOf { it.total })
+            cellStyle = totalStyle
+        }
 
-    headers.forEachIndexed { index, titulo ->
+        headers.indices.forEach { sheet.autoSizeColumn(it) }
 
-        headerRow
-            .createCell(index)
-            .setCellValue(titulo)
-    }
-
-    // datos
-
-    facturas.forEachIndexed { index, factura ->
-
-        val row =
-            sheet.createRow(index + 3)
-
-        row.createCell(0)
-            .setCellValue(factura.fecha)
-
-        row.createCell(1)
-            .setCellValue(factura.numeroFactura)
-
-        row.createCell(2)
-            .setCellValue(factura.proveedor)
-
-        row.createCell(3)
-            .setCellValue(factura.productos)
-
-        row.createCell(4)
-            .setCellValue(factura.total)
-
-        row.createCell(5)
-            .setCellValue(factura.usuario)
-
-        row.createCell(6)
-            .setCellValue(factura.notas)
-    }
-
-    // ajustar columnas
-
-    for (i in headers.indices) {
-
-        sheet.autoSizeColumn(i)
-    }
-
-    val file = File(
-
-        context.cacheDir,
-
-        "facturas_${System.currentTimeMillis()}.xlsx"
-    )
-
-    try {
-
-        val fos =
-            FileOutputStream(file)
-
-        workbook.write(fos)
-
-        fos.flush()
-
-        fos.close()
-
+        val file = File(context.cacheDir, "facturas_${System.currentTimeMillis()}.xlsx")
+        FileOutputStream(file).use { workbook.write(it) }
         workbook.close()
-
-        Toast.makeText(
-
-            context,
-
-            "Excel generado correctamente",
-
-            Toast.LENGTH_LONG
-
-        ).show()
-
-    } catch (e: IOException) {
-
-        Toast.makeText(
-
-            context,
-
-            "Error de archivo Excel",
-
-            Toast.LENGTH_LONG
-
-        ).show()
-
-        e.printStackTrace()
-
+        ExportShareUtil.abrirExcel(context, file)
     } catch (e: Exception) {
-
-        Toast.makeText(
-
-            context,
-
-            "Error: ${e.message}",
-
-            Toast.LENGTH_LONG
-
-        ).show()
-
-        e.printStackTrace()
+        Toast.makeText(context, "Error Excel: ${e.message}", Toast.LENGTH_LONG).show()
     }
 }

@@ -1,42 +1,43 @@
 package com.example.inventario.ui.entradas
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
-import android.net.Uri
-import android.widget.Toast
-import androidx.core.content.FileProvider
-import com.example.inventario.data.Entrada
+import com.example.inventario.data.bodega.Entrada
+import com.example.inventario.ui.branding.BrandingExports
+import com.example.inventario.ui.export.ExportShareUtil
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
-fun exportarEntradasPDF(context: Context, entradas: List<Entrada>, periodo: String) {
+suspend fun generarEntradasPdfFile(
+    context: Context,
+    entradas: List<Entrada>,
+    periodo: String,
+    etiquetaBodega: String = "Bodega",
+    onProgress: (Float) -> Unit = {}
+): File = withContext(Dispatchers.IO) {
+    onProgress(0.1f)
     val file = File(context.cacheDir, "entradas_${System.currentTimeMillis()}.pdf")
     val pdfDocument = PdfDocument()
-    
-    // Ancho ampliado para reporte detallado
     val pageInfo = PdfDocument.PageInfo.Builder(1400, 2000, 1).create()
     val page = pdfDocument.startPage(pageInfo)
     val canvas = page.canvas
 
-    val tituloPaint = Paint().apply { textSize = 30f; isFakeBoldText = true }
-    val subtituloPaint = Paint().apply { textSize = 20f; isFakeBoldText = false }
     val textoPaint = Paint().apply { textSize = 14f }
     val encabezadoPaint = Paint().apply { textSize = 14f; isFakeBoldText = true }
     val lineaPaint = Paint().apply { strokeWidth = 1f }
 
-    canvas.drawText("Reporte Detallado de Entradas", 50f, 60f, tituloPaint)
-    canvas.drawText("Periodo: $periodo", 50f, 95f, subtituloPaint)
-    
-    val fechaActual = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
-    canvas.drawText("Generado el: $fechaActual", 50f, 130f, textoPaint)
+    onProgress(0.25f)
+    var y = BrandingExports.drawPdfHeader(
+        context, canvas, pageInfo.pageWidth,
+        "Reporte Detallado de Entradas",
+        "Periodo: $periodo · $etiquetaBodega"
+    ) + 20f
 
-    var y = 180f
-    // Encabezados
     canvas.drawText("Fecha", 40f, y, encabezadoPaint)
     canvas.drawText("Código", 150f, y, encabezadoPaint)
     canvas.drawText("Descripción", 270f, y, encabezadoPaint)
@@ -50,11 +51,12 @@ fun exportarEntradasPDF(context: Context, entradas: List<Entrada>, periodo: Stri
     canvas.drawLine(40f, y, 1360f, y, lineaPaint)
     y += 35f
 
-    entradas.forEach { e ->
-        if (y > 1900) return@forEach // Simplificación para demo
-
-        canvas.drawText(e.fecha.take(10), 40f, y, textoPaint)
-        canvas.drawText(e.codigo, 150f, y, textoPaint)
+    onProgress(0.4f)
+    val total = entradas.size.coerceAtLeast(1)
+    entradas.forEachIndexed { index, e ->
+        if (y > 1900) return@forEachIndexed
+        canvas.drawText(e.fechaIngreso.take(10), 40f, y, textoPaint)
+        canvas.drawText(e.codigoProducto, 150f, y, textoPaint)
         canvas.drawText(e.descripcion.take(25), 270f, y, textoPaint)
         canvas.drawText(e.cantidad.toString(), 550f, y, textoPaint)
         canvas.drawText(e.unidad, 630f, y, textoPaint)
@@ -62,22 +64,33 @@ fun exportarEntradasPDF(context: Context, entradas: List<Entrada>, periodo: Stri
         canvas.drawText(e.proveedor.take(20), 880f, y, textoPaint)
         canvas.drawText(e.notas.take(30), 1100f, y, textoPaint)
         y += 30f
+        onProgress(0.4f + (index + 1) * 0.5f / total)
     }
 
     pdfDocument.finishPage(page)
+    onProgress(0.95f)
+    FileOutputStream(file).use { fos -> pdfDocument.writeTo(fos) }
+    pdfDocument.close()
+    onProgress(1f)
+    file
+}
 
-    try {
-        val fos = FileOutputStream(file)
-        pdfDocument.writeTo(fos)
-        fos.close()
-        pdfDocument.close()
-
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        context.startActivity(Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        })
-    } catch (e: Exception) {
-        Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+fun exportarEntradasPDF(
+    context: Context,
+    entradas: List<Entrada>,
+    periodo: String,
+    etiquetaBodega: String = "Bodega"
+) {
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            val file = generarEntradasPdfFile(context, entradas, periodo, etiquetaBodega)
+            withContext(Dispatchers.Main) {
+                ExportShareUtil.abrirPdf(context, file)
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                android.widget.Toast.makeText(context, "Error: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
     }
 }

@@ -1,6 +1,5 @@
 package com.example.inventario.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -12,36 +11,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
+// Legacy — usar InventarioTheme en AppColores.kt
+private val LegacyDark = darkColorScheme(
     primary = VerdePrincipal,
     secondary = VerdeSuave,
-    tertiary = VerdeFondo,
     background = Color(0xFF121212),
     surface = Color(0xFF1E1E1E),
     onPrimary = Color.White,
-    onSecondary = Color.Black,
-    onTertiary = Color.Black,
-    onBackground = Color.White,
-    onSurface = Color.White
+    onBackground = Color(0xFFE8F5E9),
+    onSurface = Color(0xFFE8F5E9)
 )
 
-private val LightColorScheme = lightColorScheme(
+private val LegacyLight = lightColorScheme(
     primary = VerdePrincipal,
     secondary = VerdeSuave,
-    tertiary = VerdeFondo,
     background = VerdeFondo,
     surface = Color.White,
     onPrimary = Color.White,
-    onSecondary = Color.Black,
-    onTertiary = Color.Black,
-    onBackground = Color.Black,
-    onSurface = Color.Black
+    onBackground = Color(0xFF1B3A1F),
+    onSurface = Color(0xFF1B3A1F)
 )
 
+@Deprecated("Usar InventarioTheme de AppColores.kt")
 @Composable
-fun InventarioTheme(
+fun LegacyInventarioTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Desactivamos dynamicColor por defecto para mantener el tema verde del usuario
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -50,14 +44,8 @@ fun InventarioTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        darkTheme -> LegacyDark
+        else -> LegacyLight
     }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
 }

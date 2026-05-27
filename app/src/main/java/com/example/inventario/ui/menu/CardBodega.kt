@@ -1,22 +1,33 @@
 package com.example.inventario.ui.menu
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-
-import androidx.compose.material3.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 
 import androidx.compose.runtime.Composable
 
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun CardBodega(
@@ -29,120 +40,89 @@ fun CardBodega(
 
     ruta: String,
 
+    icono: ImageVector,
+
     onClick: () -> Unit
 
 ) {
 
-    val icono = when (ruta) {
-
-        "inventario" ->
-            Icons.Default.Inventory
-
-        "crearProducto" ->
-            Icons.Default.AddBox
-
-        "entradas" ->
-            Icons.Default.Input
-
-        "salidas" ->
-            Icons.Default.Output
-
-        "facturas" ->
-            Icons.Default.Description
-
-        "presupuesto" ->
-            Icons.Default.AttachMoney
-
-        "stockBajo" ->
-            Icons.Default.Warning
-
-        else ->
-            Icons.Default.Inventory
-    }
-
     Card(
 
         modifier = Modifier
-            .width(160.dp)
+
+            .fillMaxWidth()
+
             .clickable {
 
                 onClick()
             },
 
-        shape =
-            RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(22.dp),
 
-        colors =
-            CardDefaults.cardColors(
+        colors = CardDefaults.cardColors(
 
-                containerColor =
-                    MaterialTheme.colorScheme.surface
-            ),
+            containerColor =
 
-        elevation =
-            CardDefaults.cardElevation(
+                MaterialTheme
+                    .colorScheme
+                    .surface
+        ),
 
-                defaultElevation = 4.dp
-            )
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 6.dp
+        )
 
     ) {
 
         Column(
 
-            modifier =
-                Modifier.padding(18.dp)
+            modifier = Modifier
+
+                .background(
+                    color.copy(alpha = 0.08f)
+                )
+
+                .padding(18.dp),
+
+            verticalArrangement =
+                Arrangement.Center,
+
+            horizontalAlignment =
+                Alignment.CenterHorizontally
 
         ) {
 
-            Box(
+            Icon(
 
-                modifier = Modifier
-                    .size(64.dp)
-                    .background(
+                imageVector = icono,
 
-                        color,
+                contentDescription = titulo,
 
-                        RoundedCornerShape(20.dp)
-                    ),
-
-                contentAlignment =
-                    Alignment.Center
-
-            ) {
-
-                Icon(
-
-                    imageVector = icono,
-
-                    contentDescription = null,
-
-                    tint = Color.White,
-
-                    modifier =
-                        Modifier.size(32.dp)
-                )
-            }
+                tint = color
+            )
 
             Spacer(
+
                 modifier =
-                    Modifier.height(16.dp)
+                    Modifier.height(12.dp)
             )
 
             Text(
 
                 text = titulo,
 
-                style =
-                    MaterialTheme.typography.titleSmall,
+                fontSize = 18.sp,
 
-                fontWeight =
-                    FontWeight.Bold,
+                fontWeight = FontWeight.Bold,
 
                 color =
-                    MaterialTheme.colorScheme.onSurface
+                    MaterialTheme
+                        .colorScheme
+                        .onSurface
             )
 
             Spacer(
+
                 modifier =
                     Modifier.height(6.dp)
             )
@@ -151,11 +131,12 @@ fun CardBodega(
 
                 text = descripcion,
 
-                style =
-                    MaterialTheme.typography.bodySmall,
+                fontSize = 13.sp,
 
                 color =
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                    MaterialTheme
+                        .colorScheme
+                        .onSurfaceVariant
             )
         }
     }

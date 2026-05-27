@@ -1,691 +1,245 @@
 package com.example.inventario.ui.inventario
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.PictureAsPdf
-
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-
 import androidx.navigation.NavController
-
-import com.example.inventario.data.producto
-
-import com.example.inventario.ui.AppTopBar
-
+import com.example.inventario.data.bodega.Producto
+import com.example.inventario.navigation.NavRoutes
+import com.example.inventario.ui.components.BodegaScrollableListScaffold
 import com.example.inventario.viewModel.ProductoViewModel
 import com.example.inventario.viewModel.SessionManager
 
-@OptIn(ExperimentalMaterial3Api::class)
-
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun InventarioScreen(
-
     navController: NavController,
-
     bodegaId: String
-
 ) {
-
     val context = LocalContext.current
+    val productoViewModel: ProductoViewModel = viewModel()
 
-    val productoViewModel:
-            ProductoViewModel = viewModel()
-
-    // Launcher para importar Excel
-    val launcherImportar = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            val productosImportados = importarExcel(context, it, bodegaId)
-            productosImportados.forEach { p ->
-                productoViewModel.agregarProducto(p)
-            }
-        }
-    }
-
+    var codigoBodega by remember { mutableStateOf("") }
     LaunchedEffect(bodegaId) {
-
-        productoViewModel
-            .sincronizarDesdeFirebase(
-                bodegaId
-            )
+        val db = com.example.inventario.data.repos.appdatabase.getDatabase(context)
+        val bodega = db.bodegaDao().obtenerBodegaPorId(bodegaId)
+        bodega?.let {
+            codigoBodega = it.codigoCorto
+            productoViewModel.iniciarSincronizacion(it.codigoCorto, bodegaId)
+        }
     }
 
-    val productos by productoViewModel
-        .obtenerProductos(bodegaId)
-        .collectAsState(initial = emptyList())
-
-    var busqueda by remember {
-
-        mutableStateOf("")
+    DisposableEffect(Unit) {
+        onDispose { productoViewModel.detenerSincronizacion() }
     }
 
-    val productosFiltrados =
-        remember(productos, busqueda) {
+    val productos by remember(productoViewModel, bodegaId) {
+        productoViewModel.obtenerProductos(bodegaId)
+    }.collectAsState(initial = emptyList())
 
-            productos.filter {
+    var busqueda by remember { mutableStateOf("") }
+    var filtroStatus by remember { mutableStateOf("TODOS") }
 
-                it.descripcion.contains(
-                    busqueda,
-                    ignoreCase = true
-                )
+    val productosFiltrados = productos.filter { p ->
+        val matchBusqueda = busqueda.isBlank() ||
+            p.descripcion.contains(busqueda, ignoreCase = true) ||
+            p.codigo.contains(busqueda, ignoreCase = true) ||
+            p.categoria.contains(busqueda, ignoreCase = true)
+        val matchStatus = filtroStatus == "TODOS" || p.status == filtroStatus
+        matchBusqueda && matchStatus
+    }
 
-                        ||
-
-                        it.codigo.contains(
-                            busqueda,
-                            ignoreCase = true
-                        )
-
-                        ||
-
-                        it.categoria.contains(
-                            busqueda,
-                            ignoreCase = true
-                        )
-            }
-        }
-
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
-
-    Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-
-        containerColor =
-            MaterialTheme.colorScheme.background,
-
-        topBar = {
-
-            AppTopBar(
-
-                titulo =
-                    "Inventario General",
-
-                subtitulo =
-                    "Bodega: $bodegaId",
-
-                navController =
-                    navController,
-
-                scrollBehavior = scrollBehavior
-            )
-        },
-
-        floatingActionButton = {
-
-            if (
-
-                SessionManager.esAdmin()
-
+    BodegaScrollableListScaffold(
+        titulo = "Inventario — Control",
+        bodegaId = bodegaId,
+        navController = navController
+    ) {
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
-
-                FloatingActionButton(
-
-                    onClick = {
-
-                        navController.navigate(
-
-                            "crearProducto/$bodegaId"
-                        )
-                    },
-
-                    containerColor =
-                        MaterialTheme.colorScheme.primary,
-
-                    contentColor =
-                        MaterialTheme.colorScheme.onPrimary
-
-                ) {
-
-                    Icon(
-
-                        Icons.Default.Add,
-
-                        contentDescription =
-                            null
-                    )
-                }
-            }
-        }
-
-    ) { padding ->
-
-        Column(
-
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
-
-            verticalArrangement =
-                Arrangement.spacedBy(16.dp)
-        ) {
-
-            // buscar
-
-            OutlinedTextField(
-
-                value = busqueda,
-
-                onValueChange = {
-
-                    busqueda = it
-                },
-
-                label = {
-
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-
-                        "Buscar producto"
+                        "Consulta de stock y existencias",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleSmall
                     )
-                },
-
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                singleLine = true
-            )
-
-            // botones exportar
-
-            Row(
-
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.spacedBy(10.dp)
-            ) {
-
-                // pdf
-
-                Button(
-
-                    onClick = {
-
-                        exportarInventarioPDF(
-
-                            context =
-                                context,
-
-                            productos =
-                                productosFiltrados,
-
-                            bodega =
-                                bodegaId
-                        )
-                    },
-
-                    modifier =
-                        Modifier.weight(1f),
-
-                    colors =
-                        ButtonDefaults.buttonColors(
-
-                            containerColor =
-                                MaterialTheme.colorScheme.primary
-                        )
-                ) {
-
-                    Icon(
-
-                        Icons.Default.PictureAsPdf,
-
-                        contentDescription =
-                            null,
-
-                        modifier =
-                            Modifier.size(18.dp)
-                    )
-
-                    Spacer(
-
-                        modifier =
-                            Modifier.width(6.dp)
-                    )
-
                     Text(
-                        "PDF"
+                        "El abastecimiento (productos nuevos y entradas) se registra en Entradas.",
+                        style = MaterialTheme.typography.bodySmall
                     )
-                }
-
-                // excel
-
-                Button(
-
-                    onClick = {
-
-                        exportarExcel(
-
-                            context,
-
-                            productosFiltrados
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AssistChip(
+                            onClick = { navController.navigate(NavRoutes.kardex(bodegaId)) },
+                            label = { Text("Kardex") },
+                            leadingIcon = { Icon(Icons.Default.ListAlt, null) }
                         )
-                    },
-
-                    modifier =
-                        Modifier.weight(1f),
-
-                    colors =
-                        ButtonDefaults.buttonColors(
-
-                            containerColor =
-                                MaterialTheme.colorScheme.secondary
+                        AssistChip(
+                            onClick = { navController.navigate(NavRoutes.stockBajo(bodegaId)) },
+                            label = { Text("Stock bajo") },
+                            leadingIcon = { Icon(Icons.Default.Warning, null) }
                         )
-                ) {
-
-                    Icon(
-
-                        Icons.Default.FileDownload,
-
-                        contentDescription =
-                            null,
-
-                        modifier =
-                            Modifier.size(18.dp)
-                    )
-
-                    Spacer(
-
-                        modifier =
-                            Modifier.width(6.dp)
-                    )
-
-                    Text(
-                        "Excel"
-                    )
-                }
-            }
-
-            // Botón Importar Excel (Solo Admin)
-            if (SessionManager.esAdmin()) {
-                OutlinedButton(
-                    onClick = {
-                        launcherImportar.launch("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.FileUpload, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Importar Inventario desde Excel")
-                }
-            }
-
-            // titulo
-
-            Text(
-
-                text =
-                    "Productos (${productosFiltrados.size})",
-
-                style =
-                    MaterialTheme.typography.titleMedium,
-
-                fontWeight =
-                    FontWeight.Bold
-            )
-
-            // lista
-
-            LazyColumn(
-
-                modifier =
-                    Modifier.weight(1f),
-
-                verticalArrangement =
-                    Arrangement.spacedBy(10.dp)
-            ) {
-
-                items(
-
-                    items =
-                        productosFiltrados,
-
-                    key = {
-                        it.id
-                    }
-
-                ) { producto ->
-
-                    ProductoCard(
-
-                        producto = producto,
-
-                        onEditar = {
-                            if (SessionManager.esAdmin()) {
-                                navController.navigate("editarProducto/${producto.id}")
-                            }
-                        },
-
-                        onEliminar = {
-                            if (SessionManager.esAdmin()) {
-                                productoViewModel.eliminarProducto(producto)
-                            }
+                        AssistChip(
+                            onClick = { navController.navigate(NavRoutes.movimientos(bodegaId)) },
+                            label = { Text("Movimientos") }
+                        )
+                        if (SessionManager.puedeEscribirInventario()) {
+                            AssistChip(
+                                onClick = { navController.navigate(NavRoutes.crearEntrada(bodegaId)) },
+                                label = { Text("Nueva entrada") }
+                            )
                         }
+                    }
+                }
+            }
+        }
+
+        item {
+            OutlinedTextField(
+                value = busqueda,
+                onValueChange = { busqueda = it },
+                label = { Text("Buscar por código, nombre o categoría") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        item {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("TODOS", "ACTIVO", "STOCK_BAJO", "SIN_STOCK").forEach { st ->
+                    FilterChip(
+                        selected = filtroStatus == st,
+                        onClick = { filtroStatus = st },
+                        label = { Text(st.replace('_', ' ')) }
                     )
                 }
             }
         }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = { exportarExcel(context, productosFiltrados) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.FileDownload, contentDescription = null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("Excel")
+                }
+                Button(
+                    onClick = { exportarInventarioPDF(context, productosFiltrados, bodegaId) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(Icons.Default.PictureAsPdf, contentDescription = null)
+                    Spacer(Modifier.width(4.dp))
+                    Text("PDF")
+                }
+            }
+        }
+
+        item {
+            Text(
+                "${productosFiltrados.size} productos · Stock total: ${productosFiltrados.sumOf { it.cantidad }}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (productosFiltrados.isEmpty()) {
+            item {
+                Text(
+                    "No hay productos registrados. Use Entradas para abastecer.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            items(productosFiltrados, key = { it.id }) { producto ->
+                ProductoConsultaCard(producto)
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }
 
 @Composable
-fun ProductoCard(
-
-    producto: producto,
-
-    onEditar: () -> Unit,
-
-    onEliminar: () -> Unit
-
-) {
+fun ProductoConsultaCard(producto: Producto) {
+    val colorStatus = when (producto.status) {
+        "ACTIVO" -> MaterialTheme.colorScheme.primary
+        "STOCK_BAJO" -> MaterialTheme.colorScheme.tertiary
+        "SIN_STOCK" -> MaterialTheme.colorScheme.error
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     Card(
-
-        modifier =
-            Modifier.fillMaxWidth(),
-
-        colors =
-            CardDefaults.cardColors(
-
-                containerColor =
-                    MaterialTheme.colorScheme.surface
-            ),
-
-        elevation =
-            CardDefaults.cardElevation(
-
-                defaultElevation = 3.dp
-            )
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-
         Column(
-
-            modifier =
-                Modifier.padding(16.dp),
-
-            verticalArrangement =
-                Arrangement.spacedBy(4.dp)
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-
-            Row(
-
-                modifier =
-                    Modifier.fillMaxWidth(),
-
-                horizontalArrangement =
-                    Arrangement.SpaceBetween
-            ) {
-
-                Column(
-
-                    modifier =
-                        Modifier.weight(1f)
-                ) {
-
-                    Text(
-
-                        text =
-                            producto.descripcion,
-
-                        style =
-                            MaterialTheme.typography.titleMedium,
-
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    Text(
-                        text =
-                            "Código: ${producto.codigo}"
-                    )
-
-                    Text(
-                        text =
-                            "Categoría: ${producto.categoria}"
-                    )
-
-                    Text(
-                        text =
-                            "Cantidad: ${producto.cantidad}"
-                    )
-
-                    Text(
-                        text =
-                            "Unidad: ${producto.unidad}"
-                    )
-
-                    Text(
-                        text =
-                            "Ubicación: ${producto.ubicacion}"
-                    )
-
-                    Text(
-                        text =
-                            "Proveedor: ${producto.proveedor}"
-                    )
-
-                    Text(
-                        text =
-                            "Costo: Q ${producto.costo}"
-                    )
-                    Text(
-                        text =
-                            "Presupuesto: Q ${producto.presupuesto}"
-                    )
-                    Text(
-                        text =
-                            "Fecha: ${producto.fechaIngreso}"
-                    )
-
-                    Text(
-                        text =
-                            "Notas: ${producto.notas}"
-                    )
-                }
-
-                Column {
-
-                    Text(
-
-                        text =
-                            "${producto.cantidad}",
-
-                        style =
-                            MaterialTheme.typography.titleLarge,
-
-                        fontWeight =
-                            FontWeight.Bold,
-
-                        color =
-
-                            if (
-
-                                producto.cantidad
-                                <=
-                                producto.stockMinimo
-
-                            )
-
-                                MaterialTheme
-                                    .colorScheme
-                                    .error
-
-                            else
-
-                                MaterialTheme
-                                    .colorScheme
-                                    .primary
-                    )
-                }
-            }
-
-            // stock bajo
-
-            if (
-
-                producto.cantidad
-                <=
-                producto.stockMinimo
-
-            ) {
-
-                Text(
-
-                    text =
-                        "⚠ Stock bajo",
-
-                    color =
-                        MaterialTheme
-                            .colorScheme
-                            .error,
-
-                    fontWeight =
-                        FontWeight.Bold
-                )
-            }
-
-            // botones admin
-
-            if (
-
-                SessionManager.esAdmin()
-
-            ) {
-
-                HorizontalDivider(
-
-                    modifier =
-                        Modifier.padding(vertical = 8.dp)
-                )
-
-                Row(
-
-                    modifier =
-                        Modifier.fillMaxWidth(),
-
-                    horizontalArrangement =
-                        Arrangement.End
-                ) {
-
-                    TextButton(
-
-                        onClick = onEditar
-                    ) {
-
-                        Icon(
-
-                            Icons.Default.Edit,
-
-                            contentDescription =
-                                null,
-
-                            modifier =
-                                Modifier.size(18.dp)
-                        )
-
-                        Spacer(
-
-                            modifier =
-                                Modifier.width(4.dp)
-                        )
-
-                        Text(
-                            "Editar"
-                        )
-                    }
-
-                    TextButton(
-
-                        onClick = onEliminar
-                    ) {
-
-                        Icon(
-
-                            Icons.Default.Delete,
-
-                            contentDescription =
-                                null,
-
-                            tint =
-                                MaterialTheme
-                                    .colorScheme
-                                    .error,
-
-                            modifier =
-                                Modifier.size(18.dp)
-                        )
-
-                        Spacer(
-
-                            modifier =
-                                Modifier.width(4.dp)
-                        )
-
-                        Text(
-
-                            text =
-                                "Eliminar",
-
-                            color =
-                                MaterialTheme
-                                    .colorScheme
-                                    .error
-                        )
-                    }
-                }
-            }
+            Text(producto.descripcion, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text("Código: ${producto.codigo}", style = MaterialTheme.typography.bodySmall)
+            Text("Categoría: ${producto.categoria}")
+            Text("Stock: ${producto.cantidad} ${producto.unidad}", fontWeight = FontWeight.SemiBold)
+            Text("Estado: ${producto.status}", color = colorStatus, fontWeight = FontWeight.Bold)
+            if (producto.ubicacion.isNotBlank()) Text("Ubicación: ${producto.ubicacion}")
+            if (producto.proveedor.isNotBlank()) Text("Proveedor: ${producto.proveedor}")
+            Text("Fecha registro: ${producto.fechaIngreso}")
+            Text("Costo Compra: Q ${String.format("%.2f", producto.costo)}")
+            Text("Precio Venta: Q ${String.format("%.2f", producto.precioVenta)}")
         }
     }
 }
+
+/** @deprecated Usar ProductoConsultaCard — solo consulta */
+@Composable
+fun ProductoCard(
+    producto: Producto,
+    esAdmin: Boolean,
+    onEditar: () -> Unit,
+    onEliminar: () -> Unit
+) = ProductoConsultaCard(producto)

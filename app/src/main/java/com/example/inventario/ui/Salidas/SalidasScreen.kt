@@ -1,234 +1,510 @@
-package com.example.inventario.ui.Salidas
+package com.example.inventario.ui.salidas
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+
+import com.example.inventario.ui.components.BodegaScrollableListScaffold
 import androidx.compose.foundation.lazy.items
+
 import androidx.compose.foundation.shape.RoundedCornerShape
+
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Search
+
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
+
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+
+import androidx.compose.material3.rememberDatePickerState
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.util.Calendar
+
 import androidx.lifecycle.viewmodel.compose.viewModel
+
 import androidx.navigation.NavController
-import com.example.inventario.data.Salida
-import com.example.inventario.ui.AppTopBar
+
+import com.example.inventario.data.bodega.Salida
+
+import com.example.inventario.ui.config.notifications.AppTopBar
+
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.FilterChip
 import com.example.inventario.viewModel.SalidaViewModel
 import com.example.inventario.viewModel.SessionManager
+import com.example.inventario.viewModel.TipoBusquedaSalida
 
-@OptIn(ExperimentalMaterial3Api::class)
+import androidx.compose.ui.platform.LocalContext
+import com.example.inventario.ui.export.PdfExportProgressDialog
+import com.example.inventario.ui.export.launchPdfExport
+import com.example.inventario.ui.export.rememberPdfExportState
+import com.example.inventario.ui.salidas.exportarSalidasExcel
+import com.example.inventario.ui.salidas.generarSalidasPdfFile
+import java.util.Calendar
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SalidasScreen(
+
     navController: NavController,
+
     bodegaId: String
+
 ) {
+
     val context = LocalContext.current
-    val salidaViewModel: SalidaViewModel = viewModel()
+    val scope = rememberCoroutineScope()
+    val pdfState = rememberPdfExportState()
 
-    val searchQuery by salidaViewModel.searchQuery.collectAsState()
-    val filtroPeriodo by salidaViewModel.filtroPeriodo.collectAsState()
-    val periodoTexto by salidaViewModel.periodoTexto.collectAsState()
-    val fechaReferencia by salidaViewModel.fechaReferencia.collectAsState()
-    val salidas by salidaViewModel.obtenerSalidasFiltradas(bodegaId).collectAsState(initial = emptyList())
-    val totalCosto by salidaViewModel.obtenerTotalCostoFiltrado(bodegaId).collectAsState(initial = 0.0)
+    val salidaViewModel:
+            SalidaViewModel =
+        viewModel()
 
-    var showDatePicker by remember { mutableStateOf(false) }
+    val searchQuery by salidaViewModel
+        .searchQuery
+        .collectAsState()
+
+    val tipoBusqueda by salidaViewModel
+        .tipoBusqueda
+        .collectAsState()
+
+    val filtroPeriodo by salidaViewModel
+        .filtroPeriodo
+        .collectAsState()
+
+    val periodoTexto by salidaViewModel
+        .periodoTexto
+        .collectAsState()
+
+    val fechaReferencia by salidaViewModel
+        .fechaReferencia
+        .collectAsState()
+
+    val salidas by salidaViewModel
+        .obtenerSalidasFiltradas(
+            bodegaId
+        )
+        .collectAsState(
+            initial = emptyList()
+        )
+
+    var showDatePicker by remember {
+
+        mutableStateOf(false)
+    }
 
     if (showDatePicker) {
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = fechaReferencia.timeInMillis
-        )
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val cal = Calendar.getInstance().apply { timeInMillis = millis + (1000 * 60 * 60 * 24) }
-                        salidaViewModel.setFechaReferencia(cal)
-                    }
-                    showDatePicker = false
-                }) { Text("Aceptar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Cancelar") }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
-    }
 
-    LaunchedEffect(Unit) {
-        salidaViewModel.sincronizarDesdeFirebase()
-    }
+        val datePickerState =
+            rememberDatePickerState(
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            AppTopBar(
-                titulo = "Historial de Salidas",
-                subtitulo = "Bodega: $bodegaId",
-                navController = navController
+                initialSelectedDateMillis =
+                    fechaReferencia.timeInMillis
             )
-        },
-        floatingActionButton = {
-            if (SessionManager.esAdmin() || SessionManager.rolUsuario() == "encargado") {
-                FloatingActionButton(
-                    onClick = { navController.navigate("crearSalida/$bodegaId") },
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
+
+        DatePickerDialog(
+
+            onDismissRequest = {
+
+                showDatePicker = false
+            },
+
+            confirmButton = {
+
+                TextButton(
+
+                    onClick = {
+
+                        datePickerState
+                            .selectedDateMillis
+                            ?.let { millis ->
+
+                                val cal =
+                                    Calendar.getInstance()
+                                        .apply {
+
+                                            timeInMillis =
+                                                millis +
+                                                        (
+                                                                1000 *
+                                                                        60 *
+                                                                        60 *
+                                                                        24
+                                                                )
+                                        }
+
+                                salidaViewModel
+                                    .setFechaReferencia(
+                                        cal
+                                    )
+                            }
+
+                        showDatePicker = false
+                    }
+
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Registrar")
+
+                    Text("Aceptar")
+                }
+            },
+
+            dismissButton = {
+
+                TextButton(
+
+                    onClick = {
+
+                        showDatePicker = false
+                    }
+
+                ) {
+
+                    Text("Cancelar")
                 }
             }
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
+
         ) {
-            // Buscador
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { salidaViewModel.setSearchQuery(it) },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Buscar por código, descripción o vehículo...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                shape = RoundedCornerShape(12.dp),
-                singleLine = true
+
+            DatePicker(
+                state = datePickerState
             )
+        }
+    }
 
-            Spacer(modifier = Modifier.height(16.dp))
+    val header = com.example.inventario.ui.components.rememberBodegaHeader(bodegaId)
+    val bgColor = MaterialTheme.colorScheme.background
+    val accentColor = MaterialTheme.colorScheme.primary
 
-            // Resumen de Costos
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.MonetizationOn, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Column {
-                        Text("Costo Total en Periodo", style = MaterialTheme.typography.labelMedium)
-                        Text(
-                            "$${String.format("%.2f", totalCosto)}",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+    PdfExportProgressDialog(pdfState)
+
+    BodegaScrollableListScaffold(
+        titulo = "Historial Salidas",
+        bodegaId = bodegaId,
+        navController = navController,
+        containerColor = bgColor,
+        floatingActionButton = {
+            com.example.inventario.ui.components.ReadOnlyGate {
+                if (SessionManager.tienePermiso(com.example.inventario.security.AppPermission.CREAR_SALIDA)) {
+                    FloatingActionButton(
+                        containerColor = accentColor,
+                        onClick = { navController.navigate("crearSalida/$bodegaId") }
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Agregar",
+                            tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Selector de Periodo
-            PeriodoTabs(filtroPeriodo) { salidaViewModel.setFiltroPeriodo(it) }
-
-            Text(
-                text = periodoTexto,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-                    .clickable { if (filtroPeriodo != "Todo") showDatePicker = true },
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(modifier = Modifier.fillMaxWidth()) {
+        }
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 Button(
-                    onClick = { exportarSalidasPDF(context, salidas, periodoTexto) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    onClick = {
+                        launchPdfExport(context, pdfState, scope) { onProgress ->
+                            generarSalidasPdfFile(
+                                context = context,
+                                salidas = salidas,
+                                periodo = periodoTexto,
+                                etiquetaBodega = com.example.inventario.ui.components.etiquetaBodegaExport(header, bodegaId),
+                                onProgress = onProgress
+                            )
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Default.PictureAsPdf, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("PDF")
                 }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
                 Button(
-                    onClick = { exportarSalidasExcel(context, salidas, periodoTexto) },
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1D6F42))
+                    onClick = {
+                        exportarSalidasExcel(
+                            context = context,
+                            salidas = salidas,
+                            periodo = periodoTexto,
+                            etiquetaBodega = com.example.inventario.ui.components.etiquetaBodegaExport(header, bodegaId)
+                        )
+                    },
+                    modifier = Modifier.weight(1f)
                 ) {
-                    Icon(Icons.Default.TableChart, contentDescription = null)
+                    Icon(Icons.Default.FileDownload, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Excel")
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
+        item {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { salidaViewModel.setSearchQuery(it) },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = {
+                    Text(
+                        when (tipoBusqueda) {
+                            TipoBusquedaSalida.DESCRIPCION -> "Buscar por descripción..."
+                            TipoBusquedaSalida.DESTINO -> "Buscar por destino..."
+                            TipoBusquedaSalida.AREA -> "Buscar por área..."
+                            TipoBusquedaSalida.VEHICULO -> "Buscar vehículo o placa..."
+                            TipoBusquedaSalida.TODO -> "Buscar descripción, destino, área, vehículo..."
+                        }
+                    )
+                },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                },
+                shape = RoundedCornerShape(14.dp),
+                singleLine = true
+            )
+        }
 
-            if (salidas.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No se encontraron salidas", color = Color.Gray)
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(salidas) { salida ->
-                        SalidaCardItem(salida, salidaViewModel, navController)
-                    }
+        item {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                TipoBusquedaSalida.entries.forEach { tipo ->
+                    FilterChip(
+                        selected = tipoBusqueda == tipo,
+                        onClick = { salidaViewModel.setTipoBusqueda(tipo) },
+                        label = { Text(tipo.etiqueta) }
+                    )
                 }
             }
+        }
+
+        item {
+            PeriodoTabsSalida(periodoSeleccionado = filtroPeriodo) {
+                salidaViewModel.setFiltroPeriodo(it)
+            }
+        }
+
+        item {
+            Text(
+                text = periodoTexto,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        if (filtroPeriodo != "Todo") showDatePicker = true
+                    },
+                textAlign = TextAlign.Center,
+                color = accentColor
+            )
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                EstadisticaCard(
+                    titulo = "Salidas",
+                    valor = salidas.size.toString(),
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f)
+                )
+                EstadisticaCard(
+                    titulo = "Productos",
+                    valor = salidas.sumOf { it.cantidad }.toString(),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        if (salidas.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No hay salidas",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else {
+            items(salidas, key = { it.id }) { salida ->
+                SalidaCardItem(
+                    salida = salida,
+                    viewModel = salidaViewModel,
+                    navController = navController,
+                    bodegaId = bodegaId
+                )
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+fun EstadisticaCard(
+    titulo: String,
+    valor: String,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = color.copy(alpha = 0.14f)
+        )
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Text(
+                text = valor,
+                color = color,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = titulo,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
 
 @Composable
-fun PeriodoTabs(
+fun PeriodoTabsSalida(
+
     periodoSeleccionado: String,
-    onPeriodoSelected: (String) -> Unit
+
+    onPeriodoSelected:
+        (String) -> Unit
+
 ) {
-    val opciones = listOf("Dia", "Semana", "Mes", "Año", "Todo")
+
+    val opciones = listOf(
+
+        "Dia",
+        "Semana",
+        "Mes",
+        "Año",
+        "Todo"
+    )
+
+    val tabBg = MaterialTheme.colorScheme.surfaceVariant
+    val tabSelected = MaterialTheme.colorScheme.primary
+    val onTabSelected = MaterialTheme.colorScheme.onPrimary
+    val onTab = MaterialTheme.colorScheme.onSurfaceVariant
+
     Row(
+
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+            .background(tabBg, RoundedCornerShape(14.dp))
             .padding(4.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+
+        horizontalArrangement =
+            Arrangement.SpaceEvenly
+
     ) {
+
         opciones.forEach { opcion ->
-            val seleccionado = periodoSeleccionado == opcion
+
+            val seleccionado =
+
+                periodoSeleccionado ==
+                        opcion
+
             Box(
+
                 modifier = Modifier
                     .weight(1f)
                     .background(
-                        if (seleccionado) MaterialTheme.colorScheme.primary else Color.Transparent,
-                        RoundedCornerShape(8.dp)
+                        if (seleccionado) tabSelected else Color.Transparent,
+                        RoundedCornerShape(10.dp)
                     )
-                    .clickable { onPeriodoSelected(opcion) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
+                    .clickable {
+
+                        onPeriodoSelected(
+                            opcion
+                        )
+                    }
+                    .padding(
+                        vertical = 10.dp
+                    ),
+
+                contentAlignment =
+                    Alignment.Center
+
             ) {
+
                 Text(
+
                     text = opcion,
-                    color = if (seleccionado) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (seleccionado) FontWeight.Bold else FontWeight.Normal,
-                    fontSize = 13.sp
+                    color = if (seleccionado) onTabSelected else onTab
                 )
             }
         }
@@ -237,87 +513,90 @@ fun PeriodoTabs(
 
 @Composable
 fun SalidaCardItem(
+
     salida: Salida,
+
     viewModel: SalidaViewModel,
-    navController: NavController
+
+    navController: NavController,
+
+    bodegaId: String
+
 ) {
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+
+        modifier =
+            Modifier.fillMaxWidth(),
+
+        shape =
+            RoundedCornerShape(18.dp),
+
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+
+        Column(
+
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+
+        ) {
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    val desc = if (salida.descripcion.isNotEmpty()) salida.descripcion else "Sin descripción"
                     Text(
-                        text = desc,
+                        text = salida.descripcion,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        maxLines = 1
+                        fontSize = 18.sp
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Código: ${salida.codigo}",
-                        fontSize = 13.sp,
-                        color = Color.Gray
+                        text = "Código: ${salida.codigoProducto}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-                Text(
-                    text = "-${salida.cantidad}",
-                    color = Color(0xFFC62828), // Rojo oscuro
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 18.sp
-                )
-            }
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), thickness = 0.5.dp)
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(salida.fecha, fontSize = 12.sp, color = Color.Gray)
-                    }
-                    if (salida.destino.isNotEmpty()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Place, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(salida.destino, fontSize = 12.sp, color = Color.Gray)
-                        }
-                    }
-                    if (salida.vehiculo.isNotEmpty()) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.DirectionsCar, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.Gray)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(salida.vehiculo, fontSize = 12.sp, color = Color.Gray)
-                        }
+                    if (salida.numeroVale.isNotBlank()) {
+                        Text(
+                            text = "Vale: ${salida.numeroVale}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
 
-                if (SessionManager.esAdmin()) {
-                    Row {
-                        IconButton(onClick = { 
-                            if (SessionManager.esAdmin()) {
-                                navController.navigate("editarSalida/${salida.id}") 
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "-${salida.cantidad}",
+                        color = Color.Red,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp
+                    )
+                    if (SessionManager.esAdmin()) {
+                        IconButton(
+                            onClick = {
+                                navController.navigate("editarSalida/${salida.id}/$bodegaId")
                             }
-                        }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Icon(
+                                Icons.Default.Edit,
+                                contentDescription = "Editar",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         }
-                        IconButton(onClick = { 
-                            if (SessionManager.esAdmin()) {
-                                viewModel.eliminarSalida(salida) 
-                            }
-                        }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = MaterialTheme.colorScheme.error)
+                        IconButton(
+                            onClick = { viewModel.eliminarSalida(salida) }
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Eliminar",
+                                tint = Color.Red
+                            )
                         }
                     }
                 }

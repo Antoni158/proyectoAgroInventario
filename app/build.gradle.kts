@@ -283,10 +283,6 @@ dependencies {
     )
 
     implementation(
-        "com.google.firebase:firebase-auth"
-    )
-
-    implementation(
         "com.google.firebase:firebase-messaging"
     )
 
@@ -372,4 +368,7 @@ dependencies {
     debugImplementation(
         libs.androidx.compose.ui.test.manifest
     )
+    implementation("com.patrykandpatrick.vico:compose:1.13.1")
+    implementation("com.patrykandpatrick.vico:compose-m3:1.13.1")
+    implementation("io.coil-kt:coil-compose:2.6.0")
 }

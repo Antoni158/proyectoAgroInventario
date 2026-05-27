@@ -1,174 +1,109 @@
 package com.example.inventario.ui.dashboard
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
+import com.example.inventario.ui.components.BodegaScrollableListScaffold
+import com.example.inventario.viewModel.DashboardViewModel
 
-import com.example.inventario.viewModel.ProductoViewModel
-
-data class DashboardItem(
-
-    val titulo: String,
-
-    val valor: String
-)
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-
-    bodegaId: String
-
+    navController: NavController,
+    bodegaId: String,
+    dashboardViewModel: DashboardViewModel = viewModel()
 ) {
+    LaunchedEffect(bodegaId) {
+        dashboardViewModel.cargarDashboard(bodegaId)
+    }
 
-    val productoViewModel:
-            ProductoViewModel = viewModel()
+    val totalProductos by dashboardViewModel.totalProductos.collectAsState()
+    val existencias by dashboardViewModel.existencias.collectAsState()
+    val stockBajo by dashboardViewModel.stockBajo.collectAsState()
+    val valorInventario by dashboardViewModel.valorInventario.collectAsState()
+    val productoTop by dashboardViewModel.productoMasMovido.collectAsState()
+    val productoCritico by dashboardViewModel.productoCritico.collectAsState()
+    val promedioSalidas by dashboardViewModel.promedioSalidas.collectAsState()
+    val productosBajoStock by dashboardViewModel.productosBajoStock.collectAsState()
+    val prediccionesStock by dashboardViewModel.prediccionesStock.collectAsState()
 
-    val productos by productoViewModel
-        .obtenerProductos(bodegaId)
-        .collectAsState(initial = emptyList())
+    val statsEntradas by dashboardViewModel.statsEntradas.collectAsState()
+    val statsSalidas by dashboardViewModel.statsSalidas.collectAsState()
+    val statsFacturas by dashboardViewModel.statsFacturas.collectAsState()
 
-    val totalProductos =
-        productos.size
+    val areaEntradas by dashboardViewModel.areaEntradas.collectAsState()
+    val areaSalidas by dashboardViewModel.areaSalidas.collectAsState()
+    val areaFacturas by dashboardViewModel.areaFacturas.collectAsState()
+    val areaStock by dashboardViewModel.areaStock.collectAsState()
+    val totalVales by dashboardViewModel.totalVales.collectAsState()
 
-    val totalExistencias =
-        productos.sumOf {
-
-            it.cantidad
-        }
-
-    val stockBajo =
-        productos.count {
-
-            it.cantidad <= it.stockMinimo
-        }
-
-    val presupuestoTotal =
-        productos.sumOf {
-
-            it.presupuesto
-        }
-
-    val datos = listOf(
-
-        DashboardItem(
-            "Productos",
-            totalProductos.toString()
-        ),
-
-        DashboardItem(
-            "Stock Bajo",
-            stockBajo.toString()
-        ),
-
-        DashboardItem(
-            "Existencias",
-            totalExistencias.toString()
-        ),
-
-        DashboardItem(
-            "Presupuesto",
-            "Q ${presupuestoTotal}"
-        )
-    )
-
-    Column(
-
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-
+    BodegaScrollableListScaffold(
+        titulo = "Panel de análisis",
+        bodegaId = bodegaId,
+        navController = navController,
+        detalleExtra = "Dashboard"
     ) {
-
-        Text(
-
-            text = "Dashboard",
-
-            fontSize = 26.sp,
-
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
-
-        LazyVerticalGrid(
-
-            columns =
-                GridCells.Fixed(2),
-
-            verticalArrangement =
-                Arrangement.spacedBy(12.dp),
-
-            horizontalArrangement =
-                Arrangement.spacedBy(12.dp)
-        ) {
-
-            items(datos) { item ->
-
-                Card(
-
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .height(140.dp)
-
-                ) {
-
-                    Column(
-
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-
-                        verticalArrangement =
-                            Arrangement.Center,
-
-                        horizontalAlignment =
-                            Alignment.CenterHorizontally
-                    ) {
-
-                        Text(
-
-                            text = item.valor,
-
-                            fontSize = 24.sp,
-
-                            fontWeight = FontWeight.Bold,
-
-                            color =
-                                MaterialTheme.colorScheme.primary
-                        )
-
-                        Spacer(
-                            modifier = Modifier.height(8.dp)
-                        )
-
-                        Text(
-
-                            text = item.titulo
-                        )
-                    }
-                }
-            }
+        item {
+            DashboardStatus(
+                totalProductos = totalProductos,
+                stockBajo = stockBajo,
+                existencias = existencias
+            )
         }
+        item {
+            DashboardKPI(
+                productoTop = productoTop,
+                productoCritico = productoCritico,
+                valorInventario = valorInventario,
+                promedioSalidas = promedioSalidas
+            )
+        }
+        item {
+            DashboardCards(
+                productos = totalProductos,
+                stockBajo = stockBajo,
+                existencias = existencias,
+                presupuesto = valorInventario,
+                totalVales = totalVales
+            )
+        }
+        item {
+            DashboardCharts(
+                entradas = statsEntradas,
+                salidas = statsSalidas,
+                facturas = statsFacturas,
+                stockCritico = stockBajo
+            )
+        }
+        item {
+            DashboardAreaChart(
+                entradas = areaEntradas,
+                salidas = areaSalidas,
+                stock = areaStock,
+                facturas = areaFacturas
+            )
+        }
+        item {
+            DashboardDonutChart(
+                normales = totalProductos - stockBajo,
+                bajos = stockBajo,
+                criticos = productosBajoStock.count { it.cantidad <= it.stockMinimo / 2 }
+            )
+        }
+        item {
+            DashboardPrediction(predicciones = prediccionesStock)
+        }
+        item {
+            DashboardAlerts(productos = productosBajoStock)
+        }
+        item { Spacer(modifier = Modifier.height(30.dp)) }
     }
 }

@@ -1,15 +1,16 @@
-package com.example.inventario.ui.Salidas
+package com.example.inventario.ui.salidas
 
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.core.content.FileProvider
-import com.example.inventario.data.Salida
+import com.example.inventario.data.bodega.Salida
+import com.example.inventario.ui.branding.BrandingExports
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import java.io.File
 import java.io.FileOutputStream
 
-fun exportarSalidasExcel(context: Context, salidas: List<Salida>, periodo: String) {
+fun exportarSalidasExcel(context: Context, salidas: List<Salida>, periodo: String, etiquetaBodega: String = "Bodega") {
     val workbook = XSSFWorkbook()
     val sheet = workbook.createSheet("Salidas")
 
@@ -25,20 +26,14 @@ fun exportarSalidasExcel(context: Context, salidas: List<Salida>, periodo: Strin
         "Notas"
     )
 
-    // Título y Periodo
-    val titleRow = sheet.createRow(0)
-    titleRow.createCell(0).setCellValue("Reporte de Salidas - Periodo: $periodo")
+    val startRow = BrandingExports.applyExcelBrandHeader(
+        workbook, sheet, "Reporte de Salidas", headers, "Periodo: $periodo · $etiquetaBodega"
+    )
 
-    val headerRow = sheet.createRow(2)
-    headers.forEachIndexed { index, titulo ->
-        headerRow.createCell(index).setCellValue(titulo)
-    }
-
-    // Datos
     salidas.forEachIndexed { index, salida ->
-        val row = sheet.createRow(index + 3)
-        row.createCell(0).setCellValue(salida.fecha)
-        row.createCell(1).setCellValue(salida.codigo)
+        val row = sheet.createRow(startRow + index)
+        row.createCell(0).setCellValue(salida.fechaSalida)
+        row.createCell(1).setCellValue(salida.codigoProducto)
         row.createCell(2).setCellValue(salida.descripcion)
         row.createCell(3).setCellValue(salida.cantidad.toDouble())
         row.createCell(4).setCellValue(salida.destino)
